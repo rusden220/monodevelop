@@ -17,7 +17,7 @@ DEP[0]=md-addins
 DEP_NAME[0]=MDADDINS
 DEP_PATH[0]=${top_srcdir}/../md-addins
 DEP_MODULE[0]=git@github.com:xamarin/md-addins.git
-DEP_NEEDED_VERSION[0]=722e46827bba3c957f3508592d9183376e8450c8
+DEP_NEEDED_VERSION[0]=39a31113aeaa543e3fbde8d47845694b9b3fdbe9
 DEP_BRANCH_AND_REMOTE[0]="apple-two-step-auth origin/apple-two-step-auth"
  
 # heap-shot
