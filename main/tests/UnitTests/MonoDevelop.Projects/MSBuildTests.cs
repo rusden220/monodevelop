@@ -1632,6 +1632,59 @@ namespace MonoDevelop.Projects
 			Assert.IsFalse (itemGroup.Items.Any (item => item.Name != "Reference"));
 		}
 
+		[Test]
+		public async Task DeleteFileAndThenAddNewFileToProjectWithSingleFileAndImportedCSharpFilesWildcard ()
+		{
+			var fn = new CustomItemNode<SupportImportedProjectFilesDotNetProjectExtension> ();
+			WorkspaceObject.RegisterCustomExtension (fn);
+
+			try {
+				string projFile = Util.GetSampleProject ("console-project-imported-wildcard", "ConsoleProject-imported-wildcard.csproj");
+				string originalProjectFileText = File.ReadAllText (projFile);
+
+				var p = await Services.ProjectService.ReadSolutionItem (Util.GetMonitor (), projFile);
+				Assert.IsInstanceOf<Project> (p);
+				var mp = (Project)p;
+				mp.UseAdvancedGlobSupport = true;
+
+				var f = mp.Files.Single ();
+				Assert.AreEqual ("Program.cs", f.FilePath.FileName);
+				string fileToDelete = f.FilePath;
+				File.Delete (fileToDelete);
+				mp.Files.Remove (f);
+				await mp.SaveAsync (Util.GetMonitor ());
+
+				string newFile = Path.Combine (p.BaseDirectory, "Test.cs");
+				File.WriteAllText (newFile, "class Test { }");
+				mp.AddFile (newFile);
+				await mp.SaveAsync (Util.GetMonitor ());
+
+				// Second save was triggering a null reference.
+				await mp.SaveAsync (Util.GetMonitor ());
+
+				var savedProjFileText = File.ReadAllText (projFile);
+				Assert.AreEqual (originalProjectFileText, savedProjFileText);
+			} finally {
+				WorkspaceObject.UnregisterCustomExtension (fn);
+			}
+		}
+
+		[Test]
+		public async Task DeleteAllFilesIncludingWildcardItems ()
+		{
+			string projFile = Util.GetSampleProject ("console-project-with-wildcards", "ConsoleProject.csproj");
+
+			var p = await Services.ProjectService.ReadSolutionItem (Util.GetMonitor (), projFile);
+			Assert.IsInstanceOf<Project> (p);
+			var mp = (Project)p;
+			mp.UseAdvancedGlobSupport = true;
+
+			mp.Files.Clear ();
+			await p.SaveAsync (Util.GetMonitor ());
+
+			Assert.AreEqual (Util.ToSystemEndings (File.ReadAllText (p.FileName + ".saved7")), File.ReadAllText (p.FileName));
+		}
+
 		/// <summary>
 		/// Checks that the remove applies to items using the root project as the
 		/// starting point.
@@ -2123,6 +2176,39 @@ namespace MonoDevelop.Projects
 			// Check that the global property is reset
 			Assert.AreEqual (1, res.Errors.Count);
 			Assert.AreEqual ("Something failed (true.targets): true", res.Errors [0].ErrorText);
+		}
+
+		/// <summary>
+		/// Tests that the MSBuildSDKsPath property is set when building a project.
+		/// This is used by Microsoft.NET.Sdk.Web .NET Core projects when importing
+		/// other MSBuild .targets and .props.
+		/// </summary>
+		[Test]
+		public async Task BuildDotNetCoreProjectWithImportUsingMSBuildSDKsPathProperty ()
+		{
+			FilePath solFile = Util.GetSampleProject ("dotnetcore-console", "dotnetcore-msbuildsdkspath-import.sln");
+
+			FilePath sdksPath = solFile.ParentDirectory.Combine ("Sdks");
+			MSBuildProjectService.RegisterProjectImportSearchPath ("MSBuildSDKsPath", sdksPath);
+
+			try {
+				var sol = (Solution)await Services.ProjectService.ReadWorkspaceItem (Util.GetMonitor (), solFile);
+				var p = (Project)sol.Items [0];
+				p.RequiresMicrosoftBuild = true;
+
+				p.DefaultConfiguration = new DotNetProjectConfiguration ("Debug") {
+					OutputAssembly = p.BaseDirectory.Combine ("bin", "test.dll")
+				};
+				var res = await p.RunTarget (Util.GetMonitor (), "Build", ConfigurationSelector.Default);
+				var buildResult = res.BuildResult;
+
+				Assert.AreEqual (1, buildResult.Errors.Count);
+				string expectedMessage = string.Format ("Something failed (test-import.targets): {0}", sdksPath);
+				Assert.AreEqual (expectedMessage, buildResult.Errors [0].ErrorText);
+
+			} finally {
+				MSBuildProjectService.UnregisterProjectImportSearchPath ("MSBuildSDKsPath", sdksPath);
+			}
 		}
 
 		[Test]
