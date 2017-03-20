@@ -333,7 +333,10 @@ namespace MonoDevelop.Ide.Projects
 		{
 			Predicate<SolutionTemplate> templateMatch = GetTemplateFilter ();
 			templateCategories = IdeApp.Services.TemplatingService.GetProjectTemplateCategories (templateMatch).ToList ();
-			recentTemplates = IdeApp.Services.TemplatingService.RecentTemplates.GetTemplates ().ToList ();
+			if (IsNewSolution)
+				recentTemplates = IdeApp.Services.TemplatingService.RecentTemplates.GetTemplates ().Where ((t) => t.IsMatch (SolutionTemplateVisibility.NewSolution)).ToList ();
+			else
+				recentTemplates = IdeApp.Services.TemplatingService.RecentTemplates.GetTemplates ().ToList ();
 		}
 
 		Predicate<SolutionTemplate> GetTemplateFilter ()
@@ -573,7 +576,7 @@ namespace MonoDevelop.Ide.Projects
 			if (wizardProvider.HasWizard)
 				wizardProvider.BeforeProjectIsCreated ();
 
-			if (!CreateProject ())
+			if (!await CreateProject ())
 				return;
 
 			Solution parentSolution = null;
@@ -679,7 +682,7 @@ namespace MonoDevelop.Ide.Projects
 				.ToList ();
 		}
 
-		bool CreateProject ()
+		async Task<bool> CreateProject ()
 		{
 			if (!projectConfiguration.IsValid ()) {
 				MessageService.ShowError (projectConfiguration.GetErrorMessage ());
@@ -724,7 +727,7 @@ namespace MonoDevelop.Ide.Projects
 			DisposeExistingNewItems ();
 
 			try {
-				result = IdeApp.Services.TemplatingService.ProcessTemplate (template, projectConfiguration, ParentFolder);
+				result = await IdeApp.Services.TemplatingService.ProcessTemplate (template, projectConfiguration, ParentFolder);
 				if (!result.WorkspaceItems.Any ())
 					return false;
 			} catch (UserException ex) {

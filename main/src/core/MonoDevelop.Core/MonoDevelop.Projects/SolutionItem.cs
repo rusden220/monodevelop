@@ -58,12 +58,12 @@ namespace MonoDevelop.Projects
 
 		int loading;
 		ItemCollection<SolutionItem> dependencies = new ItemCollection<SolutionItem> ();
-		SolutionItemEventArgs thisItemArgs;
 		FileStatusTracker<SolutionItemEventArgs> fileStatusTracker;
 		FilePath fileName;
 		string name;
 		SolutionItemExtension itemExtension;
 		MSBuildFileFormat fileFormat;
+		internal string defaultItemId;
 		
 		SolutionItemConfiguration activeConfiguration;
 		SolutionItemConfigurationCollection configurations;
@@ -82,7 +82,6 @@ namespace MonoDevelop.Projects
 			TypeGuid = MSBuildProjectService.GetTypeGuidForItem (this);
 
 			fileFormat = MSBuildFileFormat.DefaultFormat;
-			thisItemArgs = new SolutionItemEventArgs (this);
 			configurations = new SolutionItemConfigurationCollection (this);
 			configurations.ConfigurationAdded += OnConfigurationAddedToCollection;
 			configurations.ConfigurationRemoved += OnConfigurationRemovedFromCollection;
@@ -405,11 +404,12 @@ namespace MonoDevelop.Projects
 			return file.IsNullOrEmpty ? FilePath.Empty : file.ParentDirectory; 
 		}
 
-		internal Task LoadAsync (ProgressMonitor monitor, FilePath fileName, MSBuildFileFormat format)
+		internal Task LoadAsync (ProgressMonitor monitor, FilePath fileName, MSBuildFileFormat format, string itemGuid)
 		{
 			fileFormat = format;
 			FileName = fileName;
 			Name = Path.GetFileNameWithoutExtension (fileName);
+			defaultItemId = itemGuid;
 			return ItemExtension.OnLoad (monitor);
 		}
 
@@ -443,7 +443,7 @@ namespace MonoDevelop.Projects
 			try {
 				fileStatusTracker.BeginSave ();
 				await OnSave (monitor);
-				OnSaved (thisItemArgs);
+				OnSaved (new SolutionItemSavedEventArgs (this, ParentSolution, SavingSolution));
 			} finally {
 				fileStatusTracker.EndSave ();
 			}
@@ -1214,7 +1214,7 @@ namespace MonoDevelop.Projects
 			base.OnNameChanged (e);
 		}
 		
-		protected virtual void OnSaved (SolutionItemEventArgs args)
+		protected virtual void OnSaved (SolutionItemSavedEventArgs args)
 		{
 			if (Saved != null)
 				Saved (this, args);
@@ -1474,7 +1474,7 @@ namespace MonoDevelop.Projects
 			// Do nothing by default
 		}
 
-		public event SolutionItemEventHandler Saved;
+		public event SolutionItemSavedEventHandler Saved;
 
 		/// <summary>
 		/// Occurs when the object is being disposed
