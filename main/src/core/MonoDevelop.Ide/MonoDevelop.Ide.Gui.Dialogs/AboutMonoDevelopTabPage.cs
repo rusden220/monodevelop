@@ -132,7 +132,16 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 				Text = "© 2004–" + DateTime.Now.Year + " MonoDevelop contributors",
 				MarginLeft = 12
 			});
-
+			infoBox.PackStart(new Xwt.Label()
+			{
+				Markup = string.Format("<b>{0}</b>", GettextCatalog.GetString("Build By")),
+				MarginTop = 6,
+			});
+			infoBox.PackStart(new Xwt.Label()
+			{
+				Text = "rusden220",
+				MarginLeft = 12
+			});
 			this.ShowAll ();
 		}
 	}
